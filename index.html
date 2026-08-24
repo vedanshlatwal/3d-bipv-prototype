@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>3D BIPV Potential Assessment — Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg-deep:#0a0f1a;
+    --bg-panel:#0f1826;
+    --line:#1e2b3d;
+    --text-hi:#eaf1fb;
+    --text-lo:#7d92ad;
+    --sun:#f5a623;
+    --teal:#2dd4bf;
+    --danger:#ef4a5c;
+    --font-display: 'Segoe UI', -apple-system, sans-serif;
+    --font-mono: 'SFMono-Regular', Consolas, 'Courier New', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    height:100%;
+    background:var(--bg-deep);
+    color:var(--text-hi);
+    font-family:var(--font-display);
+    overflow:hidden;
+  }
+  #app{ position:relative; width:100vw; height:100vh; }
+  canvas{ display:block; }
+
+  /* ---------- Header ---------- */
+  #header{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 26px;
+    z-index:10;
+    pointer-events:none;
+    background:linear-gradient(180deg, rgba(10,15,26,0.9) 0%, rgba(10,15,26,0.0) 100%);
+  }
+  #header .brand{ display:flex; flex-direction:column; gap:2px; }
+  #header .brand .eyebrow{
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.18em;
+    color:var(--teal); text-transform:uppercase;
+  }
+  #header .brand h1{
+    font-size:19px; font-weight:600; letter-spacing:0.01em; color:var(--text-hi);
+  }
+  #header .team{
+    font-family:var(--font-mono); font-size:11px; color:var(--text-lo);
+    text-align:right; line-height:1.5;
+  }
+  #header .team b{ color:var(--sun); }
+
+  /* ---------- Left control panel ---------- */
+  #controls{
+    position:absolute; left:20px; bottom:20px;
+    width:300px;
+    background:rgba(15,24,38,0.88);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:18px 18px 16px;
+    backdrop-filter:blur(6px);
+    z-index:10;
+  }
+  #controls h2{
+    font-size:11px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--text-lo); margin-bottom:14px; font-weight:600;
+  }
+  .row{ margin-bottom:14px; }
+  .row:last-child{ margin-bottom:0; }
+  .row label{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:12.5px; color:var(--text-hi); margin-bottom:6px;
+  }
+  .row label span.val{
+    font-family:var(--font-mono); color:var(--sun); font-size:12px;
+  }
+  input[type=range]{
+    -webkit-appearance:none; width:100%; height:4px; border-radius:2px;
+    background:var(--line); outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+    background:var(--sun); cursor:pointer; border:2px solid #0a0f1a;
+  }
+  select{
+    width:100%; background:var(--bg-deep); color:var(--text-hi);
+    border:1px solid var(--line); border-radius:6px; padding:7px 8px;
+    font-size:12.5px; font-family:var(--font-display);
+  }
+  #playBtn{
+    width:100%; margin-top:4px;
+    background:transparent; border:1px solid var(--teal); color:var(--teal);
+    border-radius:6px; padding:8px; font-size:12px; letter-spacing:0.04em;
+    cursor:pointer; font-family:var(--font-mono); transition:all .15s;
+  }
+  #playBtn:hover{ background:rgba(45,212,191,0.1); }
+  #playBtn.active{ background:var(--teal); color:var(--bg-deep); }
+
+  /* ---------- Right info panel ---------- */
+  #info{
+    position:absolute; right:20px; bottom:20px; top:auto;
+    width:280px;
+    background:rgba(15,24,38,0.9);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:18px;
+    backdrop-filter:blur(6px);
+    z-index:10;
+    max-height:calc(100vh - 130px);
+    overflow-y:auto;
+  }
+  #info h2{
+    font-size:11px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--text-lo); margin-bottom:4px; font-weight:600;
+  }
+  #info .hint{ font-size:12px; color:var(--text-lo); line-height:1.5; }
+  #info .bname{ font-size:16px; font-weight:600; margin:10px 0 12px; color:var(--text-hi); }
+  .stat{
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding:8px 0; border-top:1px solid var(--line);
+    font-size:12.5px;
+  }
+  .stat:first-of-type{ border-top:none; }
+  .stat .k{ color:var(--text-lo); }
+  .stat .v{ font-family:var(--font-mono); color:var(--text-hi); }
+  .score-bar{
+    height:8px; border-radius:4px; background:var(--line); overflow:hidden; margin-top:10px;
+  }
+  .score-bar .fill{ height:100%; border-radius:4px; transition:width .3s; }
+  .score-label{
+    display:flex; justify-content:space-between; font-size:10.5px; color:var(--text-lo);
+    margin-top:5px; font-family:var(--font-mono);
+  }
+
+  /* ---------- Legend ---------- */
+  #legend{
+    position:absolute; left:20px; top:90px;
+    background:rgba(15,24,38,0.85);
+    border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; z-index:10; width:190px;
+  }
+  #legend h3{
+    font-size:10px; letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--text-lo); margin-bottom:8px;
+  }
+  #legend .gradient{
+    height:10px; border-radius:5px;
+    background:linear-gradient(90deg,#2b4c8c,#2dd4bf,#f5d423,#f5a623,#ef4a5c);
+    margin-bottom:4px;
+  }
+  #legend .labels{
+    display:flex; justify-content:space-between;
+    font-size:9.5px; font-family:var(--font-mono); color:var(--text-lo);
+  }
+
+  /* ---------- City summary (aggregate) panel ---------- */
+  #citySummary{
+    position:absolute; right:20px; top:90px;
+    width:250px;
+    background:rgba(15,24,38,0.9);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px 16px;
+    backdrop-filter:blur(6px);
+    z-index:10;
+  }
+  #citySummary h3{
+    font-size:10px; letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--text-lo); margin-bottom:10px;
+  }
+  #citySummary .row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding:5px 0; border-top:1px solid var(--line);
+    font-size:12px; margin-bottom:0;
+  }
+  #citySummary .row:first-of-type{ border-top:none; }
+  #citySummary .row .k{ color:var(--text-lo); }
+  #citySummary .row .v{ font-family:var(--font-mono); color:var(--text-hi); }
+  #citySummary .row .v.hi{ color:var(--teal); }
+
+  #stepBadge{
+    font-family:var(--font-mono); font-size:10px; color:var(--teal);
+    background:rgba(45,212,191,0.1); border:1px solid rgba(45,212,191,0.3);
+    border-radius:20px; padding:3px 10px; display:inline-block; margin-top:4px;
+    letter-spacing:0.04em;
+  }
+
+  #loading{
+    position:absolute; inset:0; background:var(--bg-deep);
+    display:flex; align-items:center; justify-content:center;
+    z-index:50; flex-direction:column; gap:10px;
+  }
+  #loading .dot{
+    font-family:var(--font-mono); font-size:12px; color:var(--teal); letter-spacing:0.1em;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="loading"><div class="dot">INITIALIZING 3D CITY MODEL…</div></div>
+
+  <div id="header">
+    <div class="brand">
+      <div class="eyebrow">SIH 2026 · Prototype Demo</div>
+      <h1>3D BIPV Potential Assessment</h1>
+      <span id="stepBadge">Live demo — workflow steps 3–10 of 10</span>
+    </div>
+    <div class="team">Team <b>Hummingbird</b> · Smart Cities · Software<br>Drag to orbit · Click a roof or wall to inspect</div>
+  </div>
+
+  <div id="legend">
+    <h3>Solar Irradiance</h3>
+    <div class="gradient"></div>
+    <div class="labels"><span>Low</span><span>High</span></div>
+  </div>
+
+  <div id="citySummary">
+    <h3>City-Scale Solar Potential</h3>
+    <div id="citySummaryBody">
+      <div class="row"><span class="k">Buildings analyzed</span><span class="v" id="cs-buildings">–</span></div>
+      <div class="row"><span class="k">Surfaces scored</span><span class="v" id="cs-surfaces">–</span></div>
+      <div class="row"><span class="k">Total roof+façade area</span><span class="v" id="cs-area">–</span></div>
+      <div class="row"><span class="k">Est. total PV capacity</span><span class="v hi" id="cs-kwp">–</span></div>
+      <div class="row"><span class="k">Est. annual yield</span><span class="v hi" id="cs-kwh">–</span></div>
+      <div class="row"><span class="k">Avg. suitability</span><span class="v" id="cs-suit">–</span></div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <h2>Sun Position Engine</h2>
+    <div class="row">
+      <label>Time of day <span class="val" id="hourVal">12:00</span></label>
+      <input type="range" id="hourSlider" min="6" max="18" step="0.1" value="12">
+    </div>
+    <div class="row">
+      <label>Season</label>
+      <select id="seasonSel">
+        <option value="summer">Summer (high sun)</option>
+        <option value="equinox" selected>Equinox (mid sun)</option>
+        <option value="winter">Winter (low sun)</option>
+      </select>
+    </div>
+    <button id="playBtn">▶ Animate full day</button>
+  </div>
+
+  <div id="info">
+    <h2>Surface Inspector</h2>
+    <div id="infoBody">
+      <div class="hint">Click any rooftop <b>or wall</b> in the scene to view its estimated solar potential, computed live from sun angle, surface orientation and shadow occlusion — steps 4–9 of the assessment workflow. Facades are scored the same way as roofs, since BIPV uses both.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0f1a);
+  scene.fog = new THREE.Fog(0x0a0f1a, 60, 220);
+
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(55, 45, 65);
+
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.getElementById('app').appendChild(renderer.domElement);
+
+  // ---------- Orbit-style camera control (lightweight, no external lib) ----------
+  let camTheta = 0.7, camPhi = 1.0, camDist = 95, camTarget = new THREE.Vector3(0,6,0);
+  let isDragging=false, lastX=0,lastY=0;
+  renderer.domElement.addEventListener('mousedown', e=>{isDragging=true; lastX=e.clientX; lastY=e.clientY;});
+  window.addEventListener('mouseup', ()=> isDragging=false);
+  window.addEventListener('mousemove', e=>{
+    if(!isDragging) return;
+    const dx=e.clientX-lastX, dy=e.clientY-lastY;
+    camTheta -= dx*0.006;
+    camPhi = Math.min(1.45, Math.max(0.25, camPhi - dy*0.006));
+    lastX=e.clientX; lastY=e.clientY;
+  });
+  renderer.domElement.addEventListener('wheel', e=>{
+    camDist = Math.min(180, Math.max(30, camDist + e.deltaY*0.05));
+  }, {passive:true});
+  function updateCamera(){
+    camera.position.x = camTarget.x + camDist*Math.sin(camPhi)*Math.sin(camTheta);
+    camera.position.z = camTarget.z + camDist*Math.sin(camPhi)*Math.cos(camTheta);
+    camera.position.y = camTarget.y + camDist*Math.cos(camPhi);
+    camera.lookAt(camTarget);
+  }
+
+  // ---------- Ground ----------
+  const groundGeo = new THREE.PlaneGeometry(400,400);
+  const groundMat = new THREE.MeshStandardMaterial({color:0x121b29, roughness:1});
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  const grid = new THREE.GridHelper(400, 80, 0x1e2b3d, 0x141f30);
+  grid.position.y = 0.02;
+  scene.add(grid);
+
+  // ---------- Sun (directional light) ----------
+  const sun = new THREE.DirectionalLight(0xfff4de, 1.4);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048,2048);
+  sun.shadow.camera.left = -80; sun.shadow.camera.right = 80;
+  sun.shadow.camera.top = 80; sun.shadow.camera.bottom = -80;
+  sun.shadow.camera.near = 1; sun.shadow.camera.far = 300;
+  sun.shadow.bias = -0.0015;
+  scene.add(sun);
+  scene.add(sun.target);
+
+  const sunSphere = new THREE.Mesh(
+    new THREE.SphereGeometry(2.2,16,16),
+    new THREE.MeshBasicMaterial({color:0xf5a623})
+  );
+  scene.add(sunSphere);
+
+  const ambient = new THREE.HemisphereLight(0x33445c, 0x0a0f1a, 0.55);
+  scene.add(ambient);
+
+  // ---------- Procedural city ----------
+  function seededRandom(seed){
+    let s = seed;
+    return function(){ s = (s*9301+49297)%233280; return s/233280; };
+  }
+  const rand = seededRandom(42);
+
+  const buildings = []; // {mesh, roofMesh, w,d,h, x,z}
+  const GRID_N = 6, SPACING = 14;
+  for(let ix=0; ix<GRID_N; ix++){
+    for(let iz=0; iz<GRID_N; iz++){
+      if(rand() < 0.18) continue; // leave some plots empty (roads/plazas)
+      const w = 4 + rand()*4;
+      const d = 4 + rand()*4;
+      const h = 6 + rand()*rand()*26;
+      const x = (ix-GRID_N/2)*SPACING + (rand()-0.5)*4;
+      const z = (iz-GRID_N/2)*SPACING + (rand()-0.5)*4;
+
+      const mat = new THREE.MeshStandardMaterial({color:0x25344a, roughness:0.85, metalness:0.05});
+      const geo = new THREE.BoxGeometry(w,h,d);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(x, h/2, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+
+      // separate roof plane for irradiance color-coding + picking
+      const roofGeo = new THREE.PlaneGeometry(w*0.94, d*0.94);
+      const roofMat = new THREE.MeshBasicMaterial({color:0x2b4c8c, side:THREE.DoubleSide});
+      const roofMesh = new THREE.Mesh(roofGeo, roofMat);
+      roofMesh.rotation.x = -Math.PI/2;
+      roofMesh.position.set(x, h+0.06, z);
+      scene.add(roofMesh);
+
+      const b = {mesh, roofMesh, w, d, h, x, z, id: buildings.length, walls:[]};
+      roofMesh.userData.building = b;
+      roofMesh.userData.surface = 'Roof';
+      roofMesh.userData.normal = new THREE.Vector3(0,1,0);
+      buildings.push(b);
+
+      // ---- façade (wall) surfaces: BIPV needs vertical surfaces too, not just roofs ----
+      const EPS = 0.05;
+      const wallDefs = [
+        {label:'North Wall', w:w, rotY:0,            normal:new THREE.Vector3(0,0,1),  pos:new THREE.Vector3(x, h/2, z+d/2+EPS)},
+        {label:'South Wall', w:w, rotY:Math.PI,      normal:new THREE.Vector3(0,0,-1), pos:new THREE.Vector3(x, h/2, z-d/2-EPS)},
+        {label:'East Wall',  w:d, rotY:Math.PI/2,    normal:new THREE.Vector3(1,0,0),  pos:new THREE.Vector3(x+w/2+EPS, h/2, z)},
+        {label:'West Wall',  w:d, rotY:-Math.PI/2,   normal:new THREE.Vector3(-1,0,0), pos:new THREE.Vector3(x-w/2-EPS, h/2, z)},
+      ];
+      wallDefs.forEach(wd=>{
+        const wallGeo = new THREE.PlaneGeometry(wd.w*0.96, h*0.96);
+        const wallMat = new THREE.MeshBasicMaterial({color:0x2b4c8c, side:THREE.DoubleSide, transparent:true, opacity:0.92});
+        const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+        wallMesh.rotation.y = wd.rotY;
+        wallMesh.position.copy(wd.pos);
+        wallMesh.userData.building = b;
+        wallMesh.userData.surface = wd.label;
+        wallMesh.userData.normal = wd.normal;
+        wallMesh.userData.area = wd.w*0.96*h*0.96;
+        scene.add(wallMesh);
+        b.walls.push({mesh:wallMesh, normal:wd.normal, label:wd.label, area:wd.w*0.96*h*0.96, score:0});
+      });
+    }
+  }
+  camTarget.set(0, 6, 0);
+
+  // window emissive detail (cheap facade realism)
+  buildings.forEach(b=>{
+    const rows = Math.max(2, Math.floor(b.h/3));
+    const winGeo = new THREE.PlaneGeometry(b.w*0.7, b.h*0.7);
+    // skip heavy detail for perf; rely on color + shading only
+  });
+
+  // ---------- Sun position model ----------
+  function seasonMaxElevDeg(season){
+    if(season==='summer') return 78;
+    if(season==='winter') return 32;
+    return 58; // equinox
+  }
+  function computeSunDirection(hour, season){
+    // hour: 6..18 mapped to sunrise->sunset arc
+    const t = (hour-6)/12; // 0..1
+    const azimuth = THREE.MathUtils.degToRad(90 + t*180); // east(90) -> west(270)
+    const elevMax = seasonMaxElevDeg(season);
+    const elevation = THREE.MathUtils.degToRad(Math.sin(t*Math.PI) * elevMax);
+    const r = 140;
+    const dir = new THREE.Vector3(
+      r*Math.cos(elevation)*Math.cos(azimuth),
+      Math.max(r*Math.sin(elevation), 2),
+      r*Math.cos(elevation)*Math.sin(azimuth)
+    );
+    return {pos:dir, elevation, azimuth, daylight: elevation>0.02};
+  }
+
+  const raycaster = new THREE.Raycaster();
+
+  function updateSunAndIrradiance(hour, season){
+    const {pos, elevation, daylight} = computeSunDirection(hour, season);
+    sun.position.copy(pos);
+    sun.target.position.set(0,0,0);
+    sunSphere.position.copy(pos).multiplyScalar(0.55);
+    sun.visible = daylight;
+    sunSphere.visible = daylight;
+    sun.intensity = daylight ? 0.6 + Math.sin(elevation)*1.3 : 0;
+    const skyMix = daylight ? Math.sin(elevation) : 0;
+    scene.background = new THREE.Color().setHSL(0.6, 0.35, 0.05 + skyMix*0.12);
+    ambient.intensity = 0.25 + skyMix*0.4;
+
+    const sunDirNorm = pos.clone().normalize();
+
+    buildings.forEach(b=>{
+      let score = 0;
+      if(daylight){
+        // orientation factor: flat roof, normal = up
+        const orientFactor = Math.max(0, sunDirNorm.y); // dot with (0,1,0)
+        // shadow occlusion test: ray from roof center to sun, check building blockers
+        const origin = new THREE.Vector3(b.x, b.h+0.3, b.z);
+        raycaster.set(origin, sunDirNorm);
+        raycaster.far = 300;
+        const blockers = buildings.filter(o=>o!==b).map(o=>o.mesh);
+        const hits = raycaster.intersectObjects(blockers, false);
+        const shadowFactor = hits.length>0 ? 0.12 : 1.0;
+        score = orientFactor * shadowFactor;
+      }
+      b.score = score; // 0..1
+      b.mesh.material.emissive = new THREE.Color(0,0,0);
+      const c = irradianceColor(score);
+      b.roofMesh.material.color.copy(c);
+
+      // ---- façade (wall) scoring: same physics, vertical normal instead of up ----
+      b.walls.forEach(wall=>{
+        let wScore = 0;
+        if(daylight){
+          const orientFactor = Math.max(0, wall.normal.dot(sunDirNorm));
+          const origin = wall.mesh.position.clone().addScaledVector(wall.normal, 0.3);
+          raycaster.set(origin, sunDirNorm);
+          raycaster.far = 300;
+          const blockers = buildings.filter(o=>o!==b).map(o=>o.mesh);
+          const hits = raycaster.intersectObjects(blockers, false);
+          const shadowFactor = hits.length>0 ? 0.12 : 1.0;
+          wScore = orientFactor * shadowFactor;
+        }
+        wall.score = wScore;
+        wall.mesh.material.color.copy(irradianceColor(wScore));
+      });
+    });
+
+    updateCitySummary();
+    if(selectedSurface) updateInfoPanel(selectedSurface.building, selectedSurface.type, selectedSurface.wall);
+  }
+
+  // ---- City-scale aggregate (workflow step 10: Solar Potential Map) ----
+  const YIELD_PANEL_EFF = 0.20, YIELD_PERF_RATIO = 0.8, YIELD_PEAK_IRR = 1.0,
+        YIELD_SUN_HOURS = 1600, YIELD_SUITABLE_FRACTION = 0.75;
+
+  function surfaceYield(area, score){
+    const kWp = area*YIELD_SUITABLE_FRACTION*YIELD_PANEL_EFF*YIELD_PEAK_IRR;
+    const kWh = kWp*YIELD_SUN_HOURS*YIELD_PERF_RATIO*(0.35+score*0.65);
+    return {kWp, kWh};
+  }
+
+  function updateCitySummary(){
+    let totalArea=0, totalKWp=0, totalKWh=0, scoreSum=0, surfaceCount=0;
+    buildings.forEach(b=>{
+      const roofArea = b.w*0.94*b.d*0.94;
+      const ry = surfaceYield(roofArea, b.score);
+      totalArea += roofArea; totalKWp += ry.kWp; totalKWh += ry.kWh;
+      scoreSum += b.score; surfaceCount++;
+      b.walls.forEach(wall=>{
+        const wy = surfaceYield(wall.area, wall.score);
+        totalArea += wall.area; totalKWp += wy.kWp; totalKWh += wy.kWh;
+        scoreSum += wall.score; surfaceCount++;
+      });
+    });
+    const avgSuitPct = surfaceCount ? (scoreSum/surfaceCount*100) : 0;
+    document.getElementById('cs-buildings').textContent = buildings.length;
+    document.getElementById('cs-surfaces').textContent = surfaceCount + ' (roof+façade)';
+    document.getElementById('cs-area').textContent = totalArea.toFixed(0) + ' m²';
+    document.getElementById('cs-kwp').textContent = totalKWp.toFixed(0) + ' kWp';
+    document.getElementById('cs-kwh').textContent = (totalKWh/1000).toFixed(1) + ' MWh/yr';
+    document.getElementById('cs-suit').textContent = avgSuitPct.toFixed(0) + '%';
+  }
+
+  function irradianceColor(t){
+    // 5-stop gradient: low->high  blue, teal, yellow, orange, red
+    const stops = [
+      {t:0.0, c:new THREE.Color(0x2b4c8c)},
+      {t:0.35, c:new THREE.Color(0x2dd4bf)},
+      {t:0.6, c:new THREE.Color(0xf5d423)},
+      {t:0.8, c:new THREE.Color(0xf5a623)},
+      {t:1.0, c:new THREE.Color(0xef4a5c)}
+    ];
+    for(let i=0;i<stops.length-1;i++){
+      if(t>=stops[i].t && t<=stops[i+1].t){
+        const local = (t-stops[i].t)/(stops[i+1].t-stops[i].t || 1);
+        return stops[i].c.clone().lerp(stops[i+1].c, local);
+      }
+    }
+    return stops[stops.length-1].c;
+  }
+
+  // ---------- Picking (roofs AND walls — click any surface to inspect) ----------
+  let selectedSurface = null; // {building, type:'Roof'|wallLabel, wall?}
+  const raycasterPick = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  let highlightOutline = null;
+
+  renderer.domElement.addEventListener('click', (e)=>{
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX-rect.left)/rect.width)*2-1;
+    mouse.y = -((e.clientY-rect.top)/rect.height)*2+1;
+    raycasterPick.setFromCamera(mouse, camera);
+    const pickable = [];
+    buildings.forEach(b=>{
+      pickable.push(b.roofMesh);
+      b.walls.forEach(w=>pickable.push(w.mesh));
+    });
+    const hits = raycasterPick.intersectObjects(pickable);
+    if(hits.length>0){
+      const obj = hits[0].object;
+      const b = obj.userData.building;
+      const surface = obj.userData.surface;
+      const wall = surface==='Roof' ? null : b.walls.find(w=>w.mesh===obj);
+      selectSurface(b, surface, wall, obj);
+    }
+  });
+
+  function selectSurface(b, surface, wall, mesh){
+    selectedSurface = {building:b, type:surface, wall};
+    if(highlightOutline) scene.remove(highlightOutline);
+    const edges = new THREE.EdgesGeometry(mesh.geometry);
+    highlightOutline = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({color:0xffffff, transparent:true, opacity:0.9}));
+    highlightOutline.rotation.copy(mesh.rotation);
+    highlightOutline.position.copy(mesh.position).addScaledVector(mesh.userData.normal, 0.04);
+    scene.add(highlightOutline);
+    updateInfoPanel(b, surface, wall);
+  }
+
+  function updateInfoPanel(b, surfaceType, wall){
+    const area = wall ? wall.area : (b.w*0.94*b.d*0.94);
+    const score = wall ? (wall.score||0) : (b.score||0);
+    const {kWp, kWh:annualKWh} = surfaceYield(area, score);
+    const suitability = score>0.6?'High':score>0.3?'Moderate':'Low';
+    const color = irradianceColor(score);
+    const hex = '#'+color.getHexString();
+    const areaLabel = wall ? 'Façade area' : 'Roof area';
+
+    document.getElementById('infoBody').innerHTML = `
+      <div class="bname">Building #${b.id+1} · ${surfaceType}</div>
+      <div class="stat"><span class="k">Footprint</span><span class="v">${b.w.toFixed(1)} × ${b.d.toFixed(1)} m</span></div>
+      <div class="stat"><span class="k">Height</span><span class="v">${b.h.toFixed(1)} m</span></div>
+      <div class="stat"><span class="k">${areaLabel}</span><span class="v">${area.toFixed(1)} m²</span></div>
+      <div class="stat"><span class="k">Current irradiance</span><span class="v">${(score*100).toFixed(0)}%</span></div>
+      <div class="stat"><span class="k">Est. PV capacity</span><span class="v">${kWp.toFixed(1)} kWp</span></div>
+      <div class="stat"><span class="k">Est. annual yield</span><span class="v">${annualKWh.toFixed(0)} kWh/yr</span></div>
+      <div class="stat"><span class="k">Suitability</span><span class="v" style="color:${hex}">${suitability}</span></div>
+      <div class="score-bar"><div class="fill" style="width:${score*100}%; background:${hex}"></div></div>
+      <div class="score-label"><span>Low</span><span>High</span></div>
+    `;
+  }
+
+  // ---------- UI wiring ----------
+  const hourSlider = document.getElementById('hourSlider');
+  const hourVal = document.getElementById('hourVal');
+  const seasonSel = document.getElementById('seasonSel');
+  const playBtn = document.getElementById('playBtn');
+  let playing = false;
+
+  function formatHour(h){
+    const hh = Math.floor(h);
+    const mm = Math.round((h-hh)*60);
+    return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');
+  }
+
+  function refresh(){
+    const hour = parseFloat(hourSlider.value);
+    hourVal.textContent = formatHour(hour);
+    updateSunAndIrradiance(hour, seasonSel.value);
+  }
+  hourSlider.addEventListener('input', refresh);
+  seasonSel.addEventListener('change', refresh);
+
+  playBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    playBtn.classList.toggle('active', playing);
+    playBtn.textContent = playing ? '⏸ Pause' : '▶ Animate full day';
+  });
+
+  // ---------- Resize ----------
+  window.addEventListener('resize', ()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ---------- Init ----------
+  refresh();
+  updateCamera();
+  document.getElementById('loading').style.display = 'none';
+
+  let lastT = performance.now();
+  function animate(now){
+    requestAnimationFrame(animate);
+    const dt = (now-lastT)/1000; lastT = now;
+    if(playing){
+      let h = parseFloat(hourSlider.value) + dt*1.3;
+      if(h>18) h = 6;
+      hourSlider.value = h;
+      refresh();
+    }
+    updateCamera();
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
