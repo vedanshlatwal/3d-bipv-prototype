@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Tests / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Env & secrets
+.env
+
+# Data (large / generated)
+data/processed/*
+data/output/*
+!data/processed/.gitkeep
+!data/output/.gitkeep
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS
+Thumbs.db
+.DS_Store

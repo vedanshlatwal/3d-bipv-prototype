@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>3D BIPV Potential Assessment — Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.132/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<script>
+    window.CESIUM_ION_ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IllnUEU1ejh6QUZtZEVaS2oiLCJqdGkiOiI1YmZkYWIyNC04ZTg4LTRhYzEtYWRiZC1lYWZjZDU1ODQ2MGQiLCJpZCI6NDcxMzkzLCJzdWIiOiJDYWx2aXVzIiwiaXNzIjoiaHR0cHM6Ly9hcGkuY2VzaXVtLmNvbSIsImF1ZCI6IkJJUFYgTUFLSU5HICIsImlhdCI6MTc4NzYwMDU5MX0.s0wTaM2eWiU3hNuC428SDPMH0p6iIBTal6zFeb_0uBc';
+</script>
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.132/Build/Cesium/Cesium.js"></script>
+<style>
+  :root{
+    --bg-deep:#0a0f1a; --bg-panel:#0f1826; --line:#1e2b3d;
+    --text-hi:#eaf1fb; --text-lo:#7d92ad; --sun:#f5a623; --teal:#2dd4bf; --danger:#ef4a5c;
+    --font-display:'Segoe UI', -apple-system, sans-serif;
+    --font-mono:'SFMono-Regular', Consolas, 'Courier New', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%; background:var(--bg-deep); color:var(--text-hi); font-family:var(--font-display); overflow:hidden;}
+  #app{position:relative; width:100vw; height:100vh;}
+  #cesiumContainer{position:absolute; inset:0;}
+  canvas{display:block;}
+  #cesiumContainer .cesium-viewer-bottom{display:none;}
+
+  #header{position:absolute; top:0; left:0; right:0; display:flex; align-items:flex-start; justify-content:space-between; padding:18px 26px; z-index:10; pointer-events:none; background:linear-gradient(180deg, rgba(10,15,26,0.9) 0%, rgba(10,15,26,0) 100%);}
+  #header .brand{display:flex; flex-direction:column; gap:2px;}
+  #header .eyebrow{font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.18em; color:var(--teal); text-transform:uppercase;}
+  #header h1{font-size:19px; font-weight:600;}
+  #header .team{font-family:var(--font-mono); font-size:11px; color:var(--text-lo); text-align:right; line-height:1.5;}
+  #header .team b{color:var(--sun);}
+  #stepBadge,#modeBadge{font-family:var(--font-mono); font-size:10px; border-radius:20px; padding:3px 10px; display:inline-block; margin-top:4px; letter-spacing:0.04em;}
+  #stepBadge{color:var(--teal); background:rgba(45,212,191,0.1); border:1px solid rgba(45,212,191,0.3);}
+  #modeBadge{color:var(--sun); background:rgba(245,166,35,0.1); border:1px solid rgba(245,166,35,0.3); margin-left:6px;}
+
+  .panel{position:absolute; background:rgba(15,24,38,0.92); border:1px solid var(--line); border-radius:10px; z-index:10; backdrop-filter:blur(6px);}
+  .panel h2,.panel h3{font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-lo); margin-bottom:12px; font-weight:600;}
+
+  #legend{left:20px; top:90px; padding:12px 14px; width:210px;}
+  #legend h3{margin-bottom:8px;}
+  #legend .gradient{height:10px; border-radius:5px; background:linear-gradient(90deg,#ef4a5c,#f5a623,#f5d423,#9ccc65,#43a047); margin-bottom:4px;}
+  #legend .ticks{display:flex; justify-content:space-between; font-size:9px; font-family:var(--font-mono); color:var(--text-lo); margin-bottom:2px;}
+  #legend .labels{display:flex; justify-content:space-between; font-size:9.5px; font-family:var(--font-mono); color:var(--text-lo);}
+  #legend .attrib{font-size:9px; color:var(--text-lo); line-height:1.5; margin-top:12px;}
+
+  #citySummary{right:20px; top:90px; width:250px; padding:14px 16px;}
+  #citySummary h3{margin-bottom:10px;}
+  #citySummary .summary-row{display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; border-top:1px solid var(--line); font-size:12px;}
+  #citySummary .summary-row:first-of-type{border-top:0;}
+  #citySummary .k{color:var(--text-lo);}
+  #citySummary .v{font-family:var(--font-mono); color:var(--text-hi);}
+  #citySummary .v.hi{color:var(--teal);}
+
+  #location{left:20px; bottom:20px; width:300px; padding:16px 18px;}
+  #location h2{margin-bottom:12px;}
+  #location .grid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  #location .grid .full{grid-column:1/3;}
+  #location label{display:block; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-lo); margin-bottom:4px;}
+  #location input{width:100%; background:var(--bg-deep); color:var(--text-hi); border:1px solid var(--line); border-radius:6px; padding:7px 8px; font-size:12px; font-family:var(--font-mono);}
+  #loadBtn{width:100%; margin-top:10px; background:var(--teal); color:var(--bg-deep); border:1px solid var(--teal); border-radius:6px; padding:8px; font-size:12px; letter-spacing:0.04em; cursor:pointer; font-family:var(--font-mono); transition:all .15s;}
+  #loadBtn:hover{background:rgba(45,212,191,0.85);}
+
+  #camera{left:50%; top:80px; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:6px; padding:10px 12px;}
+  #camera .cam-row{display:flex; gap:8px;}
+  #camera button{background:rgba(10,15,26,0.8); border:1px solid var(--line); color:var(--text-hi); border-radius:6px; padding:6px 12px; font-size:11px; letter-spacing:0.04em; cursor:pointer; font-family:var(--font-mono); transition:all .15s;}
+  #camera button:hover{border-color:var(--teal); color:var(--teal);}
+  #camera .cam-hint{font-family:var(--font-mono); font-size:9.5px; color:var(--text-lo); letter-spacing:0.03em; white-space:nowrap;}
+
+  #info{right:20px; bottom:20px; width:290px; padding:18px; max-height:calc(100vh - 130px); overflow-y:auto;}
+  #info h2{margin-bottom:4px;}
+  #info .hint{font-size:12px; color:var(--text-lo); line-height:1.5;}
+  #info .bname{font-size:15px; font-weight:600; margin:14px 0 4px; color:var(--text-hi);}
+  #info .sub{font-family:var(--font-mono); font-size:11px; color:var(--teal); margin-bottom:8px;}
+  #info .divider{font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--teal); margin:16px 0 6px; font-weight:600;}
+  .stat{display:flex; justify-content:space-between; align-items:baseline; padding:6px 0; border-top:1px solid var(--line); font-size:12px;}
+  .stat .k{color:var(--text-lo);}
+  .stat .v{font-family:var(--font-mono); color:var(--text-hi);}
+  .score-bar{height:8px; border-radius:4px; background:var(--line); overflow:hidden; margin-top:10px;}
+  .score-bar .fill{height:100%; border-radius:4px; transition:width .3s;}
+  .score-label{display:flex; justify-content:space-between; font-size:10.5px; color:var(--text-lo); margin-top:5px; font-family:var(--font-mono);}
+  .note{font-size:10px; color:var(--text-lo); line-height:1.5; margin-top:8px; padding:8px 10px; background:rgba(10,15,26,0.5); border:1px solid var(--line); border-radius:6px;}
+
+  #status{position:absolute; left:50%; transform:translateX(-50%); bottom:20px; display:flex; gap:16px; background:rgba(15,24,38,0.9); border:1px solid var(--line); border-radius:20px; padding:6px 16px; z-index:10; font-family:var(--font-mono); font-size:10.5px; color:var(--text-lo);}
+  #status .ok{color:var(--teal);} #status .warn{color:var(--sun);} #status .err{color:var(--danger);}
+
+  #loading{position:absolute; inset:0; background:var(--bg-deep); display:flex; align-items:center; justify-content:center; z-index:50; flex-direction:column; gap:10px;}
+  #loading .dot{font-family:var(--font-mono); font-size:12px; color:var(--teal); letter-spacing:0.1em;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="cesiumContainer"></div>
+  <div id="loading"><div class="dot">INITIALIZING 3D CITY MODEL…</div></div>
+
+  <div id="header">
+    <div class="brand">
+      <div class="eyebrow">SIH 2026 · Prototype Demo</div>
+      <h1>3D BIPV Potential Assessment</h1>
+      <div>
+        <span id="stepBadge">Real OSM building data</span>
+        <span id="modeBadge">NO DATA</span>
+      </div>
+    </div>
+    <div class="team">Team <b>Hummingbird</b> · Smart Cities · Software<br>Drag to orbit · Click a roof or wall to inspect</div>
+  </div>
+
+  <div id="legend" class="panel">
+    <h3>BIPV Potential</h3>
+    <div class="gradient"></div>
+    <div class="ticks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+    <div class="labels"><span>LOW</span><span>HIGH</span></div>
+    <div class="attrib">Building data: OpenStreetMap / Overpass<br>© OpenStreetMap contributors</div>
+  </div>
+
+  <div id="citySummary" class="panel">
+    <h3>City-Scale Solar Potential</h3>
+    <div class="summary-row"><span class="k">Buildings analyzed</span><span class="v" id="cs-buildings">–</span></div>
+    <div class="summary-row"><span class="k">Surfaces analyzed</span><span class="v" id="cs-surfaces">–</span></div>
+    <div class="summary-row"><span class="k">Total roof+façade area</span><span class="v" id="cs-area">–</span></div>
+    <div class="summary-row"><span class="k">Est. total PV capacity</span><span class="v hi" id="cs-kwp">–</span></div>
+    <div class="summary-row"><span class="k">Est. annual yield</span><span class="v hi" id="cs-kwh">–</span></div>
+    <div class="summary-row"><span class="k">Avg. BIPV score</span><span class="v" id="cs-suit">–</span></div>
+  </div>
+
+  <div id="camera" class="panel">
+    <div class="cam-row">
+      <button id="topViewBtn">TOP VIEW</button>
+      <button id="view3dBtn">3D VIEW</button>
+      <button id="fitBtn">FIT</button>
+      <button id="focusBtn">FOCUS</button>
+      <button id="resetBtn">RESET</button>
+    </div>
+    <span class="cam-hint">Left-drag rotate · Right-drag pan · Wheel zoom · Double-click focus</span>
+  </div>
+
+  <div id="location" class="panel">
+    <h2>Location</h2>
+    <div class="grid">
+      <div><label>Latitude</label><input id="latInput" type="number" step="0.0001" value="37.7749"></div>
+      <div><label>Longitude</label><input id="lonInput" type="number" step="0.0001" value="-122.4194"></div>
+      <div class="full"><label>Radius (m)</label><input id="radiusInput" type="number" step="50" value="250"></div>
+    </div>
+    <button id="loadBtn">LOAD BUILDINGS</button>
+  </div>
+
+  <div id="info" class="panel">
+    <h2>Building Inspector</h2>
+    <div id="infoBody">
+      <div class="hint">Enter a location and click <b>LOAD BUILDINGS</b> to fetch real OpenStreetMap buildings. Click a roof or wall to inspect. Values are <b>modelled estimates</b>, not measured field data.</div>
+    </div>
+  </div>
+
+  <div id="status">
+    <span id="st-cesium">CESIUM —</span>
+    <span id="st-city">OSM CITY —</span>
+    <span id="st-data">DATA —</span>
+  </div>
+</div>
+
+<script>
+(function(){
+  window.CESIUM_ION_ACCESS_TOKEN = window.CESIUM_ION_ACCESS_TOKEN || 'YOUR_CESIUM_ION_ACCESS_TOKEN';
+  Cesium.Ion.defaultAccessToken = window.CESIUM_ION_ACCESS_TOKEN;
+  const hasIon = Cesium.Ion.defaultAccessToken && !/YOUR_/.test(Cesium.Ion.defaultAccessToken);
+
+  const el = id => document.getElementById(id);
+  const log = (...a) => console.log('[BIPV]', ...a);
+  const R2D = Cesium.Math.toRadians;
+  const D2R = Cesium.Math.toDegrees;
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const API = (window.BIPV_API_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+
+  const state = { lat: 37.7749, lon: -122.4194, radius: 250 };
+  let buildings = [];
+  let surfaces = [];
+  let selectedSurface = null;
+  let highlightLine = null;
+
+  // ---- heatmap helpers ----------------------------------------------------
+  const STOPS = [[0, '#ef4a5c'], [0.25, '#f5a623'], [0.5, '#f5d423'], [0.75, '#9ccc65'], [1, '#43a047']];
+  function heatColor(t) {
+    t = clamp(t, 0, 1);
+    for (let i = 0; i < STOPS.length - 1; i++) {
+      if (t <= STOPS[i + 1][0]) {
+        const a = Cesium.Color.fromCssColorString(STOPS[i][1]);
+        const b = Cesium.Color.fromCssColorString(STOPS[i + 1][1]);
+        const f = (t - STOPS[i][0]) / (STOPS[i + 1][0] - STOPS[i][0]);
+        return Cesium.Color.lerp(a, b, f, new Cesium.Color());
+      }
+    }
+    return Cesium.Color.fromCssColorString(STOPS[4][1]);
+  }
+  function rating(s) {
+    if (s >= 80) return 'VERY HIGH';
+    if (s >= 60) return 'HIGH';
+    if (s >= 40) return 'MODERATE';
+    if (s >= 20) return 'MODERATE-LOW';
+    return 'LOW';
+  }
+  function label(t) {
+    return ({ roof: 'Roof', north_facade: 'North façade', south_facade: 'South façade', east_facade: 'East façade', west_facade: 'West façade' })[t] || t;
+  }
+  function heightSourceLabel(hs) {
+    if (hs === 'height' || hs === 'osm') return 'OSM height';
+    if (hs === 'building:levels' || hs === 'levels_estimate') return 'Estimated from levels';
+    return 'Default estimate';
+  }
+  function setStatus(id, text, tone) { const n = el(id); if (n) { n.textContent = text; n.className = tone || ''; } }
+
+  // ---- Cesium viewer ------------------------------------------------------
+  const viewerOpts = {
+    animation: false, timeline: false, geocoder: false, homeButton: false,
+    navigationHelpButton: false, fullscreenButton: false, sceneModePicker: false,
+    selectionIndicator: false, infoBox: false, baseLayerPicker: false,
+  };
+  if (hasIon) {
+    try { viewerOpts.terrain = Cesium.Terrain.fromWorldTerrain(); } catch (e) { log('terrain unavailable', e); }
+  } else {
+    viewerOpts.baseLayer = false;
+  }
+  const viewer = new Cesium.Viewer('cesiumContainer', viewerOpts);
+  const sc = viewer.scene.screenSpaceCameraController;
+  sc.rotateEventTypes = [Cesium.CameraEventType.LEFT_DRAG];
+  sc.translateEventTypes = [Cesium.CameraEventType.RIGHT_DRAG];
+  sc.zoomEventTypes = [Cesium.CameraEventType.WHEEL, Cesium.CameraEventType.PINCH];
+  sc.tiltEventTypes = [Cesium.CameraEventType.MIDDLE_DRAG, Cesium.CameraEventType.PINCH];
+  sc.lookEventTypes = [];
+  sc.enableRotate = true;
+  sc.enableTranslate = true;
+  sc.enableZoom = true;
+  sc.enableTilt = true;
+  sc.enableLook = false;
+  sc.enableCollisionDetection = true;
+  sc.inertiaSpin = 0.9;
+  sc.inertiaTranslate = 0.9;
+  sc.inertiaZoom = 0.85;
+  sc.minimumZoomDistance = 20;
+  sc.maximumZoomDistance = 50000;
+  setStatus('st-cesium', 'CESIUM ✓ READY', 'ok');
+
+  async function loadOsmContext() {
+    if (!hasIon) { setStatus('st-city', 'OSM CITY ○ OPTIONAL', 'warn'); return; }
+    setStatus('st-city', 'OSM CITY LOADING', 'warn');
+    try {
+      const osm = await Cesium.createOsmBuildingsAsync();
+      viewer.scene.primitives.add(osm);
+      setStatus('st-city', 'OSM CITY ✓ LOADED', 'ok');
+    } catch (err) {
+      console.error('[BIPV] OSM context failed:', err);
+      setStatus('st-city', 'OSM CITY ○ OPTIONAL', 'warn');
+    }
+  }
+
+  // ---- surface mapping + rendering ---------------------------------------
+  function mapBackendSurface(s) {
+    return {
+      id: s.surface_id,
+      buildingId: s.building_id,
+      type: s.surface_type,
+      areaM2: s.area_m2,
+      azimuthDeg: s.azimuth_deg,
+      tiltDeg: s.tilt_deg,
+      heightM: s.height_m,
+      normal: { e: (s.normal && s.normal.east) || 0, n: (s.normal && s.normal.north) || 0, u: (s.normal && s.normal.up) || 0 },
+      geometry: s.geometry,
+      samples: s.samples || [],
+      bipvScore: s.bipv_score || 0,
+      annualIrradiation: s.annual_irradiation_kwh_m2 || 0,
+      pvCapacityKwp: s.pv_capacity_kwp || 0,
+      estimatedEnergy: s.annual_energy_kwh || 0,
+      geometryQuality: s.geometry_quality || 'unknown',
+      heightSource: s.height_source || '',
+      entity: null,
+    };
+  }
+
+  function renderSurfaces() {
+    surfaces = [];
+    buildings.forEach(b => {
+      b.surfaces.forEach(s => {
+        const flat = [];
+        s.geometry.forEach(p => flat.push(p[0], p[1], p[2]));
+        s.entity = viewer.entities.add({
+          name: label(s.type),
+          polygon: {
+            hierarchy: Cesium.Cartesian3.fromDegreesArrayHeights(flat),
+            perPositionHeight: true,
+            material: heatColor(s.bipvScore / 100).withAlpha(0.72),
+          },
+          properties: { surfaceIndex: surfaces.length },
+        });
+        surfaces.push(s);
+      });
+    });
+  }
+
+  function clearSurfaces() {
+    surfaces.forEach(s => { if (s.entity) viewer.entities.remove(s.entity); });
+    surfaces = [];
+    selectedSurface = null;
+    setHighlight(null);
+  }
+
+  function setHighlight(surface) {
+    if (highlightLine) { viewer.entities.remove(highlightLine); highlightLine = null; }
+    if (!surface) return;
+    const positions = surface.geometry.map(p => Cesium.Cartesian3.fromDegrees(p[0], p[1], p[2]));
+    if (positions.length > 2) positions.push(positions[0]);
+    highlightLine = viewer.entities.add({
+      polyline: { positions, width: 4, material: Cesium.Color.fromCssColorString('#2dd4bf') },
+    });
+  }
+
+  function centroidOf(geom) {
+    if (!geom || !geom.coordinates) return null;
+    const rings = geom.type === 'MultiPolygon' ? geom.coordinates.flat() : geom.coordinates;
+    const outer = (rings[0] || []);
+    if (!outer.length) return null;
+    let lon = 0, lat = 0;
+    outer.forEach(c => { lon += c[0]; lat += c[1]; });
+    return { lon: lon / outer.length, lat: lat / outer.length };
+  }
+
+  // ---- real OSM loader ----------------------------------------------------
+  async function loadRealCity() {
+    state.lat = parseFloat(el('latInput').value) || 37.7749;
+    state.lon = parseFloat(el('lonInput').value) || -122.4194;
+    state.radius = clamp(parseFloat(el('radiusInput').value) || 250, 50, 500);
+    setStatus('st-data', '● Loading OSM buildings…', 'warn');
+    el('modeBadge').textContent = 'LOADING';
+    el('loadBtn').textContent = 'LOADING…';
+    try {
+      const resp = await fetch(API + '/api/v1/buildings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: state.lat, lon: state.lon, radius_m: state.radius }),
+      });
+      if (!resp.ok) {
+        let detail = '';
+        try { detail = (await resp.json()).detail || ''; } catch (e) {}
+        throw new Error('HTTP ' + resp.status + ' ' + detail);
+      }
+      const data = await resp.json();
+      if (!data.surfaces || !data.surfaces.length) {
+        clearSurfaces();
+        el('modeBadge').textContent = 'NO DATA';
+        setStatus('st-data', '⚠ No OSM buildings found', 'warn');
+        el('infoBody').innerHTML = '<div class="hint">No mapped buildings were found in this area. Try a larger radius or a different location.</div>';
+        return;
+      }
+
+      clearSurfaces();
+      const heightById = {};
+      const centerById = {};
+      (data.buildings.features || []).forEach(f => {
+        heightById[f.properties.building_id] = f.properties.height_m;
+        centerById[f.properties.building_id] = centroidOf(f.geometry);
+      });
+      const byBuilding = {};
+      data.surfaces.forEach(s => { (byBuilding[s.building_id] = byBuilding[s.building_id] || []).push(mapBackendSurface(s)); });
+      buildings = Object.keys(byBuilding).map(id => ({
+        id,
+        h: heightById[id] || Math.max.apply(null, byBuilding[id].map(x => x.heightM)),
+        center: centerById[id],
+        surfaces: byBuilding[id],
+      }));
+
+      renderSurfaces();
+      updateSummary();
+      el('modeBadge').textContent = 'LIVE OSM DATA';
+      setStatus('st-data', '● LIVE OSM DATA', 'ok');
+      el('infoBody').innerHTML = '<div class="hint">Loaded <b>' + data.summary.buildings + '</b> buildings and <b>' + data.summary.surfaces + '</b> surfaces from OpenStreetMap. Click a roof or wall to inspect.</div>';
+      fitBuildings();
+    } catch (err) {
+      clearSurfaces();
+      console.error('[BIPV] real OSM load failed:', err);
+      el('modeBadge').textContent = 'NO DATA';
+      setStatus('st-data', '⚠ OSM data unavailable', 'err');
+      el('infoBody').innerHTML = '<div class="hint">Real OSM building data is unavailable. Please retry or select another location.<br><br><b>' + (err.message || err) + '</b></div>';
+    } finally {
+      el('loadBtn').textContent = 'LOAD BUILDINGS';
+    }
+  }
+
+  // ---- summary + inspector -------------------------------------------------
+  function updateSummary() {
+    let area = 0, kwp = 0, kwh = 0, scoreSum = 0;
+    surfaces.forEach(s => {
+      area += s.areaM2;
+      kwp += s.pvCapacityKwp;
+      kwh += s.estimatedEnergy;
+      scoreSum += s.bipvScore;
+    });
+    el('cs-buildings').textContent = buildings.length;
+    el('cs-surfaces').textContent = surfaces.length;
+    el('cs-area').textContent = area.toFixed(0) + ' m²';
+    el('cs-kwp').textContent = kwp.toFixed(0) + ' kWp';
+    el('cs-kwh').textContent = (kwh / 1000).toFixed(1) + ' MWh/yr';
+    el('cs-suit').textContent = (surfaces.length ? (scoreSum / surfaces.length) : 0).toFixed(0) + '/100';
+  }
+
+  function buildingOverview(b) {
+    const byType = { roof: null, south_facade: null, north_facade: null, east_facade: null, west_facade: null };
+    let totalEnergy = 0, weighted = 0, totalArea = 0, roofArea = 0, facadeArea = 0;
+    b.surfaces.forEach(s => {
+      totalEnergy += s.estimatedEnergy;
+      weighted += s.bipvScore * s.areaM2;
+      totalArea += s.areaM2;
+      if (s.type === 'roof') roofArea += s.areaM2; else facadeArea += s.areaM2;
+      if (!byType[s.type] || s.bipvScore > byType[s.type].bipvScore) byType[s.type] = s;
+    });
+    return { height: b.h, roofArea, facadeArea, totalEnergy, score: totalArea ? weighted / totalArea : 0, byType };
+  }
+
+  function stat(k, v, vstyle) {
+    return '<div class="stat"><span class="k">' + k + '</span><span class="v"' + (vstyle ? ' style="' + vstyle + '"' : '') + '>' + v + '</span></div>';
+  }
+  function scoreRow(type) {
+    const o = overview.byType[type];
+    if (!o) return stat(label(type), '—');
+    return stat(label(type), o.bipvScore.toFixed(0) + '/100', 'color:' + heatColor(o.bipvScore / 100).toCssColorString());
+  }
+  let overview = null;
+
+  function showInfo(s) {
+    overview = buildingOverview(buildings.find(b => b.id === s.buildingId));
+    const t = overview;
+    const bc = heatColor(t.score / 100).toCssColorString();
+    const sc_ = heatColor(s.bipvScore / 100).toCssColorString();
+    const orient = s.tiltDeg === 0 ? 'Flat (tilt 0°)' : s.azimuthDeg + '° / tilt ' + s.tiltDeg + '°';
+
+    el('infoBody').innerHTML =
+      '<div class="bname">' + s.buildingId + '</div>' +
+      '<div class="sub">' + label(s.type) + '</div>' +
+      stat('Height', t.height.toFixed(1) + ' m') +
+      stat('Height source', heightSourceLabel(s.heightSource)) +
+      stat('Roof area', t.roofArea.toFixed(0) + ' m²') +
+      stat('Façade area', t.facadeArea.toFixed(0) + ' m²') +
+      '<div class="divider">Building BIPV Potential</div>' +
+      scoreRow('roof') + scoreRow('south_facade') + scoreRow('north_facade') + scoreRow('east_facade') + scoreRow('west_facade') +
+      stat('Building BIPV score', t.score.toFixed(0) + '/100', 'color:' + bc) +
+      stat('Potential', rating(t.score), 'color:' + bc) +
+      stat('Est. building energy', t.totalEnergy.toFixed(0) + ' kWh/yr') +
+      '<div class="divider">Surface Details</div>' +
+      stat('Type', label(s.type)) +
+      stat('Area', s.areaM2.toFixed(1) + ' m²') +
+      stat('Orientation', orient) +
+      stat('Geometry quality', s.geometryQuality || 'unknown') +
+      stat('Annual irradiation (pvlib)', s.annualIrradiation.toFixed(0) + ' kWh/m²/yr') +
+      stat('BIPV score', s.bipvScore.toFixed(0) + '/100', 'color:' + sc_) +
+      stat('Potential', rating(s.bipvScore), 'color:' + sc_) +
+      stat('Est. annual energy', s.estimatedEnergy.toFixed(0) + ' kWh/yr') +
+      '<div class="divider">Shadow Analysis</div>' +
+      '<div class="note">Shadow simulation is <b>not implemented in Review 1</b> — it is a Review 2 feature. No shading factor is applied to these results.</div>';
+  }
+
+  // ---- selection -----------------------------------------------------------
+  function pickCustomSurface(position) {
+    const picked = viewer.scene.pick(position);
+    const prop = picked && picked.id && picked.id.properties && picked.id.properties.surfaceIndex;
+    if (prop) {
+      const idx = prop.getValue(Cesium.JulianDate.now());
+      if (Number.isInteger(idx) && surfaces[idx]) return surfaces[idx];
+    }
+    return null;
+  }
+
+  function selectCustomSurface(s) {
+    selectedSurface = s;
+    setHighlight(s);
+    viewer.selectedEntity = s.entity;
+    updateInspector();
+  }
+
+  function updateInspector() {
+    if (selectedSurface) showInfo(selectedSurface);
+  }
+
+  function selectRealBuildingAt(position) {
+    if (!buildings.length) return;
+    let world = null;
+    try { world = viewer.scene.pickPosition(position); } catch (e) { world = null; }
+    if (!world) return;
+    const c = Cesium.Cartographic.fromCartesian(world);
+    const lon = D2R(c.longitude), lat = D2R(c.latitude);
+    let best = null, bestD = Infinity;
+    buildings.forEach(b => {
+      if (!b.center) return;
+      const d = (b.center.lon - lon) * (b.center.lon - lon) + (b.center.lat - lat) * (b.center.lat - lat);
+      if (d < bestD) { bestD = d; best = b; }
+    });
+    if (!best) return;
+    const bestSurface = best.surfaces.reduce((a, x) => (x.bipvScore > a.bipvScore ? x : a), best.surfaces[0]);
+    if (bestSurface) selectCustomSurface(bestSurface);
+  }
+
+  const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+  handler.setInputAction(click => {
+    const surface = pickCustomSurface(click.position);
+    if (surface) { selectCustomSurface(surface); return; }
+    selectRealBuildingAt(click.position);
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+  handler.setInputAction(() => focusSelected(), Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
+  // ---- camera controls ----------------------------------------------------
+  function cityCenter() {
+    return { lon: state.lon, lat: state.lat, maxR: Math.max(state.radius, 60) };
+  }
+  function updateCamera(lon, lat, height, headingDeg, pitchDeg, duration) {
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
+      orientation: { heading: R2D(headingDeg), pitch: R2D(pitchDeg), roll: 0 },
+      duration: duration,
+    });
+  }
+  function setTopView() {
+    const c = cityCenter();
+    updateCamera(c.lon, c.lat, Math.max(c.maxR * 2.5, 400), 0, -89.5, 1.2);
+  }
+  function set3DView() {
+    const c = cityCenter();
+    updateCamera(c.lon, c.lat, Math.max(c.maxR * 2.0, 380), -35, -42, 1.5);
+  }
+  function fitBuildings() {
+    if (!surfaces.length) { set3DView(); return; }
+    const points = [];
+    surfaces.forEach(s => s.geometry.forEach(p => points.push(Cesium.Cartesian3.fromDegrees(p[0], p[1], p[2]))));
+    if (!points.length) { set3DView(); return; }
+    const sphere = Cesium.BoundingSphere.fromPoints(points);
+    viewer.camera.flyToBoundingSphere(sphere, { duration: 1.2, offset: new Cesium.HeadingPitchRange(R2D(-35), R2D(-40), 0) });
+  }
+  function resetCamera() {
+    set3DView();
+  }
+  function focusSelected() {
+    if (!selectedSurface) return;
+    const pts = [];
+    surfaces.forEach(s => {
+      if (s.buildingId === selectedSurface.buildingId) s.geometry.forEach(p => pts.push(Cesium.Cartesian3.fromDegrees(p[0], p[1], p[2])));
+    });
+    if (!pts.length) return;
+    const sphere = Cesium.BoundingSphere.fromPoints(pts);
+    viewer.camera.flyToBoundingSphere(sphere, { duration: 1.0, offset: new Cesium.HeadingPitchRange(R2D(-35), R2D(-30), 0) });
+  }
+
+  // ---- UI wiring ------------------------------------------------------------
+  el('loadBtn').addEventListener('click', loadRealCity);
+  el('topViewBtn').addEventListener('click', setTopView);
+  el('view3dBtn').addEventListener('click', set3DView);
+  el('fitBtn').addEventListener('click', fitBuildings);
+  el('focusBtn').addEventListener('click', focusSelected);
+  el('resetBtn').addEventListener('click', resetCamera);
+  addEventListener('resize', () => viewer.resize());
+
+  // ---- init -------------------------------------------------------------------
+  setStatus('st-data', '● NO DATA', 'warn');
+  el('modeBadge').textContent = 'NO DATA';
+  loadOsmContext();
+  set3DView();
+  el('loading').style.display = 'none';
+})();
+</script>
+</body>
+</html>

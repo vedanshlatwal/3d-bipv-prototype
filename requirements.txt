@@ -1,0 +1,16 @@
+numpy>=1.26
+pandas>=2.0
+shapely>=2.0
+geopandas>=0.14
+pyproj>=3.6
+trimesh>=4.0
+pyyaml>=6.0
+fastapi>=0.110
+uvicorn>=0.29
+pydantic>=2.0
+# Optional (install when needed):
+# pvlib>=0.10          # production irradiance models (Ineichen/Perez)
+# osmnx>=1.9           # OSM building footprint download
+# matplotlib>=3.8      # quick plotting
+# folium>=0.16         # 2D leaflet map export
+# ray>=2.9             # parallel shadow simulation at district scale

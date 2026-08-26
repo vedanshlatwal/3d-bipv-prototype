@@ -1,0 +1,25 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "id": "bld_001", "name": "Tower A", "height": 24.0 },
+      "geometry": { "type": "Polygon", "coordinates": [[[77.2070, 28.6150], [77.2076, 28.6150], [77.2076, 28.6154], [77.2070, 28.6154], [77.2070, 28.6150]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "bld_002", "name": "Tower B", "height": 12.0 },
+      "geometry": { "type": "Polygon", "coordinates": [[[77.2082, 28.6148], [77.2088, 28.6148], [77.2088, 28.6152], [77.2082, 28.6152], [77.2082, 28.6148]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "bld_003", "name": "Low Block", "height": 6.0 },
+      "geometry": { "type": "Polygon", "coordinates": [[[77.2072, 28.6140], [77.2080, 28.6140], [77.2080, 28.6144], [77.2072, 28.6144], [77.2072, 28.6140]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "bld_004", "name": "Slab A", "height": 9.0 },
+      "geometry": { "type": "Polygon", "coordinates": [[[77.2090, 28.6150], [77.2096, 28.6150], [77.2096, 28.6155], [77.2090, 28.6155], [77.2090, 28.6150]]] }
+    }
+  ]
+}

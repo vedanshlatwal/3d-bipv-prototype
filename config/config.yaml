@@ -1,0 +1,26 @@
+city:
+  crs: "EPSG:4326"            # input footprints CRS
+  target_crs: "EPSG:32643"    # local UTM (z-up meters) - UTM 43N (Delhi region)
+  default_building_height: 10.0
+
+solar:
+  latitude: 28.6139           # default: New Delhi
+  longitude: 77.2090
+  timezone: "Asia/Kolkata"
+  start_date: "2026-01-01"
+  end_date: "2026-12-31"
+  timestep_minutes: 60        # hourly resolution
+  panel_efficiency: 0.20      # typical BIPV module efficiency
+  performance_ratio: 0.80     # system losses (inverter, soiling, temp, wiring)
+  albedo: 0.2                 # ground reflectance
+  clear_sky_model: "hottel"   # options: hottel (built-in), ineichen (needs pvlib)
+
+shadow:
+  enabled: true
+  min_elevation_deg: 0.0       # ignore sun positions below horizon
+
+output:
+  dir: "data/output"
+  geojson_name: "potential.geojson"
+  csv_name: "potential.csv"
+  summary_name: "summary.json"
